@@ -19,6 +19,11 @@ describe "Authentication" do
 
       it { should have_title('Sign in') }
       it { should have_error_message('Invalid') }
+      it { should_not have_link('Users') }
+      it { should_not have_link('Profile') }
+      it { should_not have_link('Settings') }
+      it { should_not have_link('Sign out', href: signout_path) }
+      it { should have_link('Sign in', href: signin_path) }
 
       describe "after visiting another page" do
         before { click_link "Home" }
@@ -62,6 +67,20 @@ describe "Authentication" do
 
           it "should render the desired protected page" do
             expect(page).to have_title('Edit user')
+          end
+
+          describe "when signing in again" do
+            before do
+              delete signout_path
+              visit signin_path
+              fill_in "Email",    with: user.email
+              fill_in "Password", with: user.password
+              click_button "Sign in"
+            end
+
+            it "should render the default (profile) page" do
+              expect(page).to have_title(user.name)
+            end
           end
         end
       end
@@ -120,6 +139,36 @@ describe "Authentication" do
       end
     end
 
+    describe "as an admin user" do
+      let(:admin) { FactoryGirl.create(:admin) }
+
+      before { sign_in admin, no_capybara: true }
+
+      describe "submitting a DELETE request to the Users#destroy action with own user" do
+        before { delete user_path(admin) }
+
+        specify { expect(response.body).not_to match(full_title('All users')) }
+        specify { expect(response).to be_redirect }
+      end
+    end
+
+    describe "as signed user" do
+      let(:user) { FactoryGirl.create(:user) }
+
+      before { sign_in user, no_capybara: true }
+
+      describe "visiting the new page" do
+        before { get new_user_path }
+        specify { expect(response.body).not_to match(full_title('Sign up')) }
+        specify { expect(response).to be_redirect }
+      end
+
+      describe "submitting a POST request to the Users#create action" do
+        before { post users_path(user) }
+        specify { expect(response.body).not_to match(full_title(user.name)) }
+        specify { expect(response).to be_redirect }
+      end
+    end
   end
 
 end
